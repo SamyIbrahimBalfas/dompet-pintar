@@ -1,0 +1,294 @@
+
+<!DOCTYPE html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dompet Pintar</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+      color: #172033;
+    }
+
+    main {
+      max-width: 480px;
+      margin: auto;
+    }
+
+    h1 { margin-bottom: 4px; }
+    .muted { color: #64748b; font-size: 14px; }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 18px;
+      margin: 16px 0;
+      box-shadow: 0 3px 12px #00000008;
+    }
+
+    .balance {
+      background: #123b32;
+      color: white;
+    }
+
+    .balance .muted { color: #d1e7df; }
+
+    .totals {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .income { color: #13804a; }
+    .expense { color: #c24141; }
+
+    label {
+      display: block;
+      margin: 12px 0 6px;
+      font-size: 14px;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 9px;
+      border: 1px solid #d5dce5;
+      font-size: 16px;
+    }
+
+    button {
+      border: 0;
+      background: #167653;
+      color: white;
+      font-weight: bold;
+      margin-top: 14px;
+    }
+
+    .transaction {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .transaction button {
+      width: auto;
+      padding: 7px 10px;
+      margin: 0;
+      background: #fee2e2;
+      color: #991b1b;
+      font-size: 12px;
+    }
+
+    .amount {
+      text-align: right;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Dompet Pintar</h1>
+  <p class="muted">Kenali ke mana uangmu pergi.</p>
+
+  <section class="card balance">
+    <p class="muted">Total saldo</p>
+    <h2 id="balance">Rp0</h2>
+  </section>
+
+  <section class="totals">
+    <div class="card">
+      <div class="muted">Pemasukan</div>
+      <h3 class="income" id="income">Rp0</h3>
+    </div>
+    <div class="card">
+      <div class="muted">Pengeluaran</div>
+      <h3 class="expense" id="expense">Rp0</h3>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>Tambah Transaksi</h3>
+
+    <form id="form">
+      <label for="type">Jenis transaksi</label>
+      <select id="type">
+        <option value="in">Pemasukan</option>
+        <option value="out">Pengeluaran</option>
+      </select>
+
+      <label for="note">Keterangan</label>
+      <input id="note" placeholder="Contoh: Gaji atau makan"
+             maxlength="80" required>
+
+      <label for="amount">Nominal (rupiah)</label>
+      <input id="amount" type="number" min="1"
+             step="1" placeholder="Contoh: 50000" required>
+
+      <button type="submit">Simpan Transaksi</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Riwayat Transaksi</h3>
+    <div id="history" class="muted">Belum ada transaksi.</div>
+  </section>
+</main>
+
+<script>
+  const storageKey = "dompetPintarV1";
+  const rupiah = new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0
+  });
+
+  let transactions = [];
+
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(storageKey) || "[]"
+    );
+
+    if (Array.isArray(saved)) {
+      transactions = saved.filter(t =>
+        t &&
+        typeof t.id === "string" &&
+        (t.type === "in" || t.type === "out") &&
+        typeof t.note === "string" &&
+        Number.isSafeInteger(t.amount) &&
+        t.amount > 0
+      );
+    }
+  } catch (error) {
+    transactions = [];
+  }
+
+  const form = document.getElementById("form");
+
+  function save() {
+    try {
+      localStorage.setItem(
+        storageKey, JSON.stringify(transactions)
+      );
+      return true;
+    } catch (error) {
+      alert("Data gagal disimpan. Periksa ruang penyimpanan.");
+      return false;
+    }
+  }
+
+  function render() {
+    const incoming = transactions
+      .filter(t => t.type === "in")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const outgoing = transactions
+      .filter(t => t.type === "out")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    document.getElementById("balance").textContent =
+      rupiah.format(incoming - outgoing);
+    document.getElementById("income").textContent =
+      rupiah.format(incoming);
+    document.getElementById("expense").textContent =
+      rupiah.format(outgoing);
+
+    const history = document.getElementById("history");
+    history.replaceChildren();
+
+    if (transactions.length === 0) {
+      history.textContent = "Belum ada transaksi.";
+      return;
+    }
+
+    [...transactions].reverse().forEach(t => {
+      const row = document.createElement("div");
+      row.className = "transaction";
+
+      const info = document.createElement("div");
+      const note = document.createElement("div");
+      note.textContent = t.note;
+
+      const date = document.createElement("div");
+      date.className = "muted";
+      date.textContent = t.date;
+
+      info.append(note, date);
+
+      const right = document.createElement("div");
+      right.className = "amount";
+
+      const amount = document.createElement("div");
+      amount.className = t.type === "in" ? "income" : "expense";
+      amount.textContent =
+        (t.type === "in" ? "+" : "-") + rupiah.format(t.amount);
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.textContent = "Hapus";
+
+      del.addEventListener("click", () => {
+        if (!confirm("Hapus transaksi ini?")) return;
+
+        const previous = transactions;
+        transactions = transactions.filter(x => x.id !== t.id);
+
+        if (!save()) {
+          transactions = previous;
+          return;
+        }
+
+        render();
+      });
+
+      right.append(amount, del);
+      row.append(info, right);
+      history.append(row);
+    });
+  }
+
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+
+    const note = document.getElementById("note").value.trim();
+    const amount = Number(
+      document.getElementById("amount").value
+    );
+    const type = document.getElementById("type").value;
+
+    if (!note || !Number.isSafeInteger(amount) || amount <= 0) {
+      alert("Isi keterangan dan nominal yang valid.");
+      return;
+    }
+
+    const transaction = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      type,
+      note,
+      amount,
+      date: new Date().toLocaleDateString("id-ID")
+    };
+
+    transactions.push(transaction);
+
+    if (!save()) {
+      transactions.pop();
+      return;
+    }
+
+    form.reset();
+    render();
+  });
+
+  render();
+</script>
+</body>
+</html>
